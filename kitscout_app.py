@@ -317,10 +317,8 @@ def dispatch_tool(name: str, args: dict) -> str:
 
 # Models ที่รองรับ — เรียงจากแนะนำไปถึง fallback
 AVAILABLE_MODELS = [
-    "gemini-1.5-flash",
-    "gemini-2.5-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-3-flash-preview"
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite"
 ]
 
 
