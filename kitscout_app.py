@@ -318,7 +318,7 @@ def dispatch_tool(name: str, args: dict) -> str:
 # Models ที่รองรับ — เรียงจากแนะนำไปถึง fallback
 AVAILABLE_MODELS = [
     "gemini-3-flash-preview",
-    "gemini-3.1-flash-lite"
+    "gemini-3.1-flash-lite",
 ]
 
 
@@ -442,7 +442,7 @@ def render_sidebar():
             "Model",
             options=AVAILABLE_MODELS,
             index=0,
-            help="gemini-3-flash-preview = เร็วและฟรีโควต้าสูง"
+            help="gemini-1.5-flash = เร็วและฟรีโควต้าสูง"
         )
 
         # เชื่อมต่อใหม่เมื่อ key หรือ model เปลี่ยน
@@ -641,9 +641,6 @@ def _render_persona_page():
             )
 
     st.markdown("")
-    st.caption(
-        "🔑 ใส่ Gemini API Key ใน sidebar แล้วเริ่มคุยกับ KitScout ได้เลยครับ"
-    )
 
 
 # ──────────────────────────────────────────────
@@ -652,10 +649,15 @@ def _render_persona_page():
 def render_chat():
     st.markdown("## 🔍 KitScout — เรดาร์เสื้อบอลส่วนตัวของคุณ")
 
+    # Persona & JTBD box — แสดงเสมอ พับ/ขยายได้
+    with st.expander("👤 เกี่ยวกับ KitScout — Persona & Jobs-to-be-Done", expanded=False):
+        _render_persona_page()
+
     if not st.session_state.api_key_ok:
         st.info("👈 ใส่ Gemini API Key ใน sidebar เพื่อเริ่มใช้งาน")
-        _render_persona_page()
         return
+
+    st.divider()
 
     # Render chat history
     for msg in st.session_state.messages:
