@@ -1,8 +1,3 @@
-"""
-KitScout — AI Agent สำหรับนักสะสมเสื้อฟุตบอล
-Streamlit App with Google Gemini + Image Upload
-"""
-
 import streamlit as st
 import google.generativeai as genai
 import json
@@ -314,26 +309,60 @@ def dispatch_tool(name: str, args: dict) -> str:
 # ──────────────────────────────────────────────
 # Gemini Agent Core
 # ──────────────────────────────────────────────
-def get_gemini_model(api_key: str):
+
+# Models ที่รองรับ — เรียงจากแนะนำไปถึง fallback
+AVAILABLE_MODELS = [
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+]
+
+
+def get_gemini_model(api_key: str, model_name: str = "gemini-1.5-flash"):
     genai.configure(api_key=api_key)
     return genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name=model_name,
         system_instruction=SYSTEM_PROMPT,
         tools=KITSCOUT_TOOLS,
     )
 
 
+def _image_to_part(pil_image: Image.Image) -> dict:
+    """แปลง PIL Image เป็น inline_data part ที่ Gemini SDK รับได้แน่นอน"""
+    buf = io.BytesIO()
+    fmt = pil_image.format or "JPEG"
+    if fmt not in ("JPEG", "PNG", "WEBP"):
+        fmt = "JPEG"
+    pil_image.save(buf, format=fmt)
+    return {
+        "inline_data": {
+            "mime_type": f"image/{fmt.lower()}",
+            "data": buf.getvalue(),
+        }
+    }
+
+
 def run_agent(model, chat, user_text: str, uploaded_image=None) -> str:
     """Send message (+ optional image) through the agentic tool-use loop."""
 
-    # Build content parts
+    # Build content parts — ส่งเป็น list[str | dict]
     content_parts = []
-    if uploaded_image:
-        content_parts.append(uploaded_image)  # PIL Image หรือ bytes
+    if uploaded_image is not None:
+        content_parts.append(_image_to_part(uploaded_image))
     if user_text:
         content_parts.append(user_text)
 
-    response = chat.send_message(content_parts)
+    try:
+        response = chat.send_message(content_parts)
+    except Exception as e:
+        err = str(e)
+        if "404" in err or "not found" in err.lower():
+            return (
+                "⚠️ ไม่พบ model ที่เลือก กรุณาเปลี่ยน model ใน sidebar\n\n"
+                f"รายละเอียด: `{err[:300]}`"
+            )
+        raise
 
     for _ in range(5):
         has_fc = any(
@@ -367,16 +396,18 @@ def run_agent(model, chat, user_text: str, uploaded_image=None) -> str:
 # Session State Init
 # ──────────────────────────────────────────────
 def init_session():
-    if "messages" not in st.session_state:
-        st.session_state.messages = []          # [{role, content, image?}]
-    if "wishlist" not in st.session_state:
-        st.session_state.wishlist = []
-    if "chat" not in st.session_state:
-        st.session_state.chat = None
-    if "model" not in st.session_state:
-        st.session_state.model = None
-    if "api_key_ok" not in st.session_state:
-        st.session_state.api_key_ok = False
+    defaults = {
+        "messages": [],
+        "wishlist": [],
+        "chat": None,
+        "model": None,
+        "api_key_ok": False,
+        "_last_cfg": "",
+        "prefill": "",
+    }
+    for key, val in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = val
 
 
 # ──────────────────────────────────────────────
@@ -403,15 +434,39 @@ def render_sidebar():
                 help="รับ Key ฟรีที่ aistudio.google.com"
             )
 
-        if api_key and not st.session_state.api_key_ok:
+        # Model selector
+        selected_model = st.selectbox(
+            "Model",
+            options=AVAILABLE_MODELS,
+            index=0,
+            help="gemini-1.5-flash = เร็วและฟรีโควต้าสูง"
+        )
+
+        # เชื่อมต่อใหม่เมื่อ key หรือ model เปลี่ยน
+        current_cfg = f"{api_key}|{selected_model}"
+        if api_key and st.session_state.get("_last_cfg") != current_cfg:
             try:
-                model = get_gemini_model(api_key)
+                with st.spinner("กำลังเชื่อมต่อ..."):
+                    model = get_gemini_model(api_key, selected_model)
+                    # ทดสอบด้วย request เล็กๆ (ไม่มี tools เพื่อความเร็ว)
+                    test_model = genai.GenerativeModel(model_name=selected_model)
+                    test_model.generate_content("hi")
                 st.session_state.model = model
                 st.session_state.chat = model.start_chat(history=[])
                 st.session_state.api_key_ok = True
-                st.success("เชื่อมต่อสำเร็จ ✅")
+                st.session_state["_last_cfg"] = current_cfg
+                st.success(f"เชื่อมต่อสำเร็จ ✅ ({selected_model})")
             except Exception as e:
-                st.error(f"API Key ไม่ถูกต้อง: {e}")
+                st.session_state.api_key_ok = False
+                err_msg = str(e)
+                if "404" in err_msg or "NotFound" in err_msg or "not found" in err_msg.lower():
+                    st.error(f"ไม่พบ model '{selected_model}' — ลองเปลี่ยน model ด้านบน")
+                elif "API_KEY" in err_msg or "invalid" in err_msg.lower():
+                    st.error("API Key ไม่ถูกต้อง กรุณาตรวจสอบ")
+                else:
+                    st.error(f"เชื่อมต่อไม่ได้: {err_msg[:200]}")
+        elif st.session_state.api_key_ok:
+            st.success(f"เชื่อมต่อแล้ว ✅ ({selected_model})")
 
         st.divider()
 
@@ -504,7 +559,9 @@ def render_chat():
             st.caption("รูปพร้อมแล้ว — พิมพ์คำถามเพื่อให้ KitScout วิเคราะห์ครับ")
 
     # Pre-fill from quick example buttons
-    prefill = st.session_state.pop("prefill", "")
+    prefill = st.session_state.get("prefill", "")
+    if prefill:
+        st.session_state["prefill"] = ""
 
     # Chat input
     user_input = st.chat_input("พิมพ์คำถาม เช่น 'เช็คความแท้จากรูปนี้ Arsenal 2002'") or prefill
