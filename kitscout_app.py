@@ -1,3 +1,8 @@
+"""
+KitScout — AI Agent สำหรับนักสะสมเสื้อฟุตบอล
+Streamlit App with Google Gemini + Image Upload
+"""
+
 import streamlit as st
 import google.generativeai as genai
 import json
@@ -313,9 +318,9 @@ def dispatch_tool(name: str, args: dict) -> str:
 # Models ที่รองรับ — เรียงจากแนะนำไปถึง fallback
 AVAILABLE_MODELS = [
     "gemini-1.5-flash",
-    "gemini-2.5-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-3-flash-preview",
+    "gemini-1.5-pro",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
 ]
 
 
@@ -518,6 +523,132 @@ def render_sidebar():
 
 
 # ──────────────────────────────────────────────
+# Persona & JTBD Landing Page
+# ──────────────────────────────────────────────
+def _render_persona_page():
+    st.divider()
+
+    # ── Persona Card ──────────────────────────
+    st.markdown("### 👤 ออกแบบมาสำหรับใคร?")
+
+    with st.container(border=True):
+        col_ctx, col_goal = st.columns(2)
+
+        with col_ctx:
+            st.markdown("**📍 Context**")
+            st.markdown(
+                "นักสะสมในกลุ่ม Resell ไทยบน Facebook เช่น "
+                "**Kit Collector Thailand** และ **เสื้อฟุตบอล มือสอง ของแท้** "
+                "ที่ใช้ Shopee · Lazada · Carousell · eBay เป็นประจำ "
+                "และคุ้นเคยกับตลาดเสื้อบอลมือสอง"
+            )
+
+        with col_goal:
+            st.markdown("**🎯 Goal**")
+            st.markdown(
+                "ตามล่าเสื้อ **Limited Edition · Vintage · Player Issue** "
+                "ของแท้ในราคาคุ้มค่า เพื่อเพิ่มชิ้นไม่ซ้ำใครในคอลเลกชัน"
+            )
+
+        st.divider()
+        col_beh, col_pain = st.columns(2)
+
+        with col_beh:
+            st.markdown("**🧠 Behaviour**")
+            st.markdown(
+                "- สะสมเสื้อหายากและเสื้อคลาสสิกอย่างจริงจัง\n"
+                "- วางแผนซื้อล่วงหน้า ตั้งราคาเป้าหมายและไซส์ไว้ใน Wishlist\n"
+                "- รอจนกว่าจะเจอราคาที่ใช่"
+            )
+
+        with col_pain:
+            st.markdown("**😤 Frustration**")
+            st.markdown(
+                "- ของกระจายหลายแพลตฟอร์ม เจอของปลอม\n"
+                "- ตัดสินใจช้า → พลาดการซื้อ\n"
+                "- ราคาตลาดไม่แน่นอน ไม่รู้ว่าแพงหรือถูก"
+            )
+
+    st.markdown("")
+
+    # ── JTBD Cards ────────────────────────────
+    st.markdown("### 🎯 Jobs-to-be-Done — KitScout ช่วยได้อะไรบ้าง?")
+
+    jtbd_list = [
+        {
+            "icon": "🔎",
+            "num": "1",
+            "title": "ค้นหาข้ามแพลตฟอร์ม",
+            "when": "อยากหาเสื้อชิ้นหนึ่ง แต่ต้องเปิดหลายแท็บพร้อมกัน",
+            "want": "ค้นจากที่เดียว ระบุชื่อ ไซส์ แพลตฟอร์มได้เลย",
+            "so":   "เห็นผลทุกแหล่งพร้อมกัน ตัดสินใจเร็วขึ้น",
+            "example": "หา Arsenal Away 2002/03 ไซส์ L ทุกแพลตฟอร์ม",
+        },
+        {
+            "icon": "🛡️",
+            "num": "2",
+            "title": "ตรวจสอบความแท้",
+            "when": "เจอเสื้อที่ชอบ แต่ไม่แน่ใจว่าของแท้ มีทั้งรูปและรายละเอียด",
+            "want": "วิเคราะห์ Badge · Font · Fabric Tag · Hologram ได้ทันที",
+            "so":   "ตัดสินใจซื้อได้มั่นใจ ไม่เสี่ยงเสียเงินกับของปลอม",
+            "example": "แนบรูปเสื้อ + พิมพ์ 'เช็คความแท้ Man Utd 1999 Home'",
+        },
+        {
+            "icon": "💰",
+            "num": "3",
+            "title": "วิเคราะห์ราคาตลาด",
+            "when": "คนขายบอกราคา แต่ไม่รู้ว่าแพงหรือถูกเมื่อเทียบตลาด",
+            "want": "รู้ช่วงราคา BNWT / BNWOT / Used แยกตามสภาพ พร้อมแหล่งอ้างอิง",
+            "so":   "ต่อราคาได้มีข้อมูล หรือรู้ว่าควรหนีจากดีลนี้",
+            "example": "เขาขาย Liverpool 2005 Final BNWT ราคา 8,000 บาท แพงไปไหม?",
+        },
+        {
+            "icon": "📋",
+            "num": "4",
+            "title": "จัดการ Wishlist",
+            "when": "เจอเสื้อที่อยากได้แต่ราคายังไม่ใช่ หรือยังไม่มีไซส์",
+            "want": "บันทึกไว้พร้อมราคาเป้าหมายและไซส์ รอจนถึงเงื่อนไข",
+            "so":   "ไม่พลาดเมื่อของหายากปรากฏในราคาที่รับได้",
+            "example": "เพิ่ม Zidane 98 World Cup Final ไว้ใน Wishlist ราคาเป้าหมาย 12,000 บาท",
+        },
+        {
+            "icon": "📚",
+            "num": "5",
+            "title": "ความรู้เชิงลึก Football Kit",
+            "when": "สับสนเรื่อง Replica vs Authentic vs Player Issue หรือไม่รู้ว่า BNWT คืออะไร",
+            "want": "คำอธิบายจากผู้เชี่ยวชาญ ไม่ต้องออกจาก App ไปค้น Google",
+            "so":   "ตัดสินใจซื้อได้ถูกต้อง และพูดคุยในชุมชนได้อย่างมีความรู้",
+            "example": "Player Issue กับ Match Worn ต่างกันยังไง ราคาห่างกันมากไหม?",
+        },
+    ]
+
+    for j in jtbd_list:
+        with st.expander(f"{j['icon']} JTBD {j['num']}: {j['title']}", expanded=False):
+            cols = st.columns([1, 1, 1])
+            with cols[0]:
+                st.markdown("**🕐 When**")
+                st.caption(j["when"])
+            with cols[1]:
+                st.markdown("**💡 I want to**")
+                st.caption(j["want"])
+            with cols[2]:
+                st.markdown("**✅ So I can**")
+                st.caption(j["so"])
+            st.markdown(
+                f"<div style='margin-top:8px; padding:8px 12px; "
+                f"background:#f0f4ff; border-left:3px solid #4f8ef7; "
+                f"border-radius:4px; font-size:0.85rem; color:#333;'>"
+                f"💬 <b>ลองพิมพ์:</b> {j['example']}</div>",
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("")
+    st.caption(
+        "🔑 ใส่ Gemini API Key ใน sidebar แล้วเริ่มคุยกับ KitScout ได้เลยครับ"
+    )
+
+
+# ──────────────────────────────────────────────
 # Main Chat UI
 # ──────────────────────────────────────────────
 def render_chat():
@@ -525,14 +656,7 @@ def render_chat():
 
     if not st.session_state.api_key_ok:
         st.info("👈 ใส่ Gemini API Key ใน sidebar เพื่อเริ่มใช้งาน")
-        st.markdown("""
-**KitScout ช่วยได้เรื่อง:**
-- 🔎 ค้นหาเสื้อจากหลายแพลตฟอร์ม
-- 🛡️ เช็คความแท้จากรูปและรายละเอียด
-- 💰 วิเคราะห์ราคา Resell Value
-- 📋 จัดการ Wishlist พร้อมราคาเป้าหมาย
-- 📚 ข้อมูลเชิงลึก Football Kit
-        """)
+        _render_persona_page()
         return
 
     # Render chat history
